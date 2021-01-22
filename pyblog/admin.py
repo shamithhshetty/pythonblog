@@ -10,6 +10,7 @@ from .tasks import *
 # Register your models here.
 class BookJob(admin.ModelAdmin):
 	list_display= [field.name for field in Job._meta.fields]+['add_link',]
+	search_fields = ('id',)
 	def add_link(self, obj):
 		url = (
 			"http://127.0.0.1:8000/"
@@ -23,7 +24,7 @@ class BookJob(admin.ModelAdmin):
 
 class BookBlog(admin.ModelAdmin):
     list_display= ('id','get_author_name','title','full_date','description')
-    search_fields = ('author__author_name',)
+    search_fields = ('author__author_name','description')
     list_filter = ('date',)
     
     def full_date(self,obj):
@@ -32,8 +33,7 @@ class BookBlog(admin.ModelAdmin):
 	 
     def get_author_name(self, obj):
         authorobj=Author.objects.get(id=obj.author_id)
-        link = reverse("admin:pyblog_author_change", args=[obj.author_id])
-        return format_html('<a href="{}">  {}</a>', link,  authorobj.author_name)
+        return format_html('<a href="http://127.0.0.1:8000/admin/pyblog/author/?q={}">  {}</a>', obj.author_id,  authorobj.author_name)
     get_author_name.short_description = "Author Name"
 
 
@@ -41,7 +41,7 @@ class BookBlog(admin.ModelAdmin):
 	
 class BookAuthor(admin.ModelAdmin):
 	list_display= [field.name for field in Author._meta.fields][:-5]+['get_facebook','get_blogger','get_twitter','get_gmail','get_pinterest']
-	search_fields = ('author_name',)
+	search_fields = ('id','author_name')
 	def get_facebook(self,obj):
 		url = (obj.facebook)
 		return  format_html('<a href="{}">facebook</a>', url)
@@ -78,17 +78,20 @@ class BookLog(admin.ModelAdmin):
 	get_stat_id.short_description='stats id'
 	
 class BookStats(admin.ModelAdmin):
-	list_display= ('id','get_job_name','status','start_time','end_time')
+	list_display = ('id', 'get_job_name', 'status', 'start_time', 'end_time','get_log_details')
 	search_fields = ('job__job_name',)
 	list_filter = ('job_id',)
 	def get_job_name(self, obj):
-		job_obj=Job.objects.get(id = obj.job_id)
-		link = reverse("admin:pyblog_job_change", args=[obj.job_id])
-		return format_html('<a href="{}">  {}</a>', link,  job_obj.job_name)
+		job_obj = Job.objects.get(id = obj.job_id)
+		return format_html('<a href="http://127.0.0.1:8000/admin/pyblog/job/?q={}">  {}</a>', obj.job_id,  job_obj.job_name)
 	get_job_name.short_description = "Job Name"
 	
+	def get_log_details(self, obj):
+		return format_html('<a href="http://127.0.0.1:8000/admin/pyblog/log/?q={}">view log</a>', obj.id )
+	get_log_details.short_description = "Logs"	
+	
 class BookLink(admin.ModelAdmin):
-	list_display= [field.name for field in Link._meta.fields][:-2]+['get_blog_name','add_link',]
+	list_display = [field.name for field in Link._meta.fields][:-2]+[ 'get_blog_name', 'add_link',]
 	def add_link(self, obj):
 		url = (
 			 obj.link_data 
