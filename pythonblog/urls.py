@@ -20,4 +20,6 @@ from pyblog import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('blogs/<int:job_id>/',views.blogs ),
+    path('fetch/<int:job_id>/',views.fetch ),
+
 ]

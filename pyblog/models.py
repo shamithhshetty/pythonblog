@@ -46,7 +46,10 @@ class Job(models.Model):
     year = models.PositiveSmallIntegerField()  
     month = models.IntegerField(blank=True, null=True)
     max_fetch = models.PositiveSmallIntegerField(blank=True, null=True)
-     
+    start_point = models.IntegerField()
+    end_point = models.IntegerField()
+    no_of_fetch = models.IntegerField()
+    
     class Meta:
         managed = False
         db_table = 'Job'
@@ -55,11 +58,28 @@ class Job(models.Model):
             raise ValidationError(" Year is numeric")
         elif not( self.year >=2011 and self.year <= datetime.datetime.now().year ):
             raise ValidationError("Year is between 2011 and "+str(datetime.datetime.now().year))
-         
+            
+        if not(str(self.start_point).isdigit()):
+            raise ValidationError(" Year is numeric")
+        elif not( self.start_point >=0 and self.start_point <= 100 ):
+            raise ValidationError("Year is between 0 and 100")
+            
+        if not(str(self.end_point).isdigit()):
+            raise ValidationError(" Year is numeric")
+        elif not( self.end_point >=0 and self.end_point <= 100 ):
+            raise ValidationError("Year is between 0 and 100")
+        if not(str(self.no_of_fetch).isdigit()):
+            raise ValidationError(" Year is numeric")
+        elif not( self.no_of_fetch >=0 and self.no_of_fetch <= 100 ):
+            raise ValidationError("Year is between 0 and 100") 
+		
         if self.month:
             if not(self.month >= 0 and self.month <= 12):
                 raise ValidationError("month is eigther None or  between 0 and 12")
-   
+        if self.start_point > self.end_point :
+            raise ValidationError("start date must be less than end date")
+        if  (self.end_point - self.start_point)< self.no_of_fetch :
+            raise ValidationError("no of fetch less the start and end point")          
 
 class Link(models.Model):
     blog = models.ForeignKey(Blog, on_delete=models.CASCADE)

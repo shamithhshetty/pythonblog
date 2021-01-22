@@ -14,7 +14,7 @@ class BookJob(admin.ModelAdmin):
 	def add_link(self, obj):
 		url = (
 			"http://127.0.0.1:8000/"
-            + "blogs/"
+            + "fetch/"
             + str(obj.id)+"/"
 		)
 		return format_html('<a class="btn btn-primary" href="{}">Fetch</a>', url)

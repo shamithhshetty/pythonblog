@@ -108,16 +108,97 @@ def get_data_with_year(job_obj,stats_id,filename):
 			get_blog_data(blog_url+str(month_id)+"/",10)
 	return list_month
 	'''
-
+def get_total_blogs_per_year(year):
+	url=URL+"/"+str(year)+"/"
+	content = fetch_data(url)
+	soup = BeautifulSoup( content, 'html.parser' )
+	return len(soup.find_all('div',class_="post-outer"))
+def find_start_point_year(start_point,year_list):
+	sum_year=0
+	start_year=2011
+	total_blogs=0
+	for year in year_list:
+		start_year=year
+		total_blogs=get_total_blogs_per_year(year)
+		sum_year=sum_year+total_blogs
+		if start_point <= sum_year :
+			break
+	return (start_year,(sum_year-start_point)+1,total_blogs)		
+ 
+	
+				
+def fetch_blog_data(year,start_point,no_of_fetch,job_id):
+	blog_url=URL+"/"+str(year)+"/"
+	blog_content = fetch_data(blog_url)
+	soup = BeautifulSoup( blog_content, 'html.parser')		
+	blogs=soup.find_all('div', class_ = "date-outer")
+	count = 1
+	fetch=0
+	for blog in blogs:
+		temp_date=blog.h2.span.string
+		blog_date=temp_date[temp_date.find(',')+2:]
+		blog_outer = blog.find_all('div',class_="post-outer")
+		for outer in blog_outer:
+			if start_point > count:
+				count=count+1
+				continue
+			if no_of_fetch == fetch :
+				return fetch
+				
+			title = outer.h3.a.string 
+			description = outer.find("div",class_="post-body")
+			author_name = outer.find("div",class_="post-footer").find("span",class_="fn").string
+			facebook = outer.find("a",class_="sb-facebook")["href"]
+			twitter = outer.find("a",class_="sb-twitter")["href"]
+			pinterest = outer.find("a",class_="sb-pinterest")["href"]
+			blogger = outer.find("a",class_="sb-blog")["href"]
+			gmail = outer.find("a",class_="sb-email")["href"]
+			#insert data
+			authorobj,created = Author.objects.get_or_create(author_name = author_name.strip())
+			aobj=Author(id=authorobj.id,author_name = author_name.strip(),facebook =  facebook.strip(), gmail = gmail.strip(), pinterest = pinterest.strip(), twitter = twitter.strip(), blogger = blogger.strip())
+			aobj.save()
+			blogObj,created = Blog.objects.get_or_create(author = authorobj,title = title, date = datetime.datetime.strptime(blog_date, '%B %d, %Y'),description = str(description.text))
+			for link in description.find_all('a'):
+				linkobj,created = Link.objects.get_or_create(blog = blogObj, link_data=link['href'])
+			fetch=fetch+1
+	 
+	return fetch
+	
+def change_start_point(start_point,increment,job_id):
+	job_obj=Job.objects.get(id=job_id)
+	job_obj.start_point=start_point+increment
+	job_obj.save(update_fields=['start_point'])
+	
+def check_eligible_for_fetch_endpoint(start,end,no_of_fetch):
+	if end-start >= no_of_fetch :
+		return True
+	else:
+		return False
+			
 @shared_task(bind=True)
-def scrape( self, job_id, stats_id ):
+def extractor( self, job_id, stats_id ):
+	fetch_done=0
 	job_obj = get_job_data( job_id )  #retrive job details based on job id 
-	add_stats_details( stats_id, "Checking YEAR="+str(job_obj.year)+" and MONTH "+ str(job_obj.month))
-	add_log_details(stats_id,"Checking YEAR="+str(job_obj.year)+" and MONTH "+ str(job_obj.month))
-	if job_obj.month and job_obj.year:
-		filename = str( job_id )+"_"+str( job_obj.month )+"_"+str( job_obj.year )
-		s = get_data_with_month_year( job_obj,stats_id,filename )
-	elif job_obj.year:
-		filename = str( job_id ) +"_"+str( job_obj.year )
-		s = get_data_with_year( job_obj, stats_id, filename )
-	return str(s)+"  records fetched successfully" 
+	year_list=[i for i in range(2011,2022)]
+	start_year,remaining_blogs,total_blogs= find_start_point_year(job_obj.start_point,year_list)
+	if job_obj.no_of_fetch <= remaining_blogs:
+		if check_eligible_for_fetch_endpoint(job_obj.start_point-1,job_obj.end_point,job_obj.no_of_fetch) :
+			fetch_done=fetch_blog_data(start_year,(total_blogs-remaining_blogs)+1,job_obj.no_of_fetch,job_id)
+		else: 
+			fetch_done=fetch_blog_data(start_year,(total_blogs-remaining_blogs)+1,(job_obj.end_point-job_obj.start_point)+1,job_id)
+	else:
+		fetch_done=fetch_blog_data(start_year,(total_blogs-remaining_blogs)+1,remaining_blogs ,job_id)
+		for year in range(start_year+1,2021+1):
+			remaining_fetch=job_obj.no_of_fetch-fetch_done
+			if remaining_fetch <= 0:
+				change_start_point(job_obj.start_point,fetch_done,job_id)
+				return fetch_done
+			total_blogs=get_total_blogs_per_year(year)
+			 
+			if remaining_fetch <= total_blogs:
+				fetch_done=fetch_done + fetch_blog_data(year,1,remaining_fetch ,job_id)
+			else: 
+				fetch_done=fetch_done + fetch_blog_data(year,1,total_blogs ,job_id)
+		
+	return  fetch_done
+
